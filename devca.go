@@ -21,7 +21,7 @@ import (
 func main() {
 
 	if len(os.Args) < 2 {
-		fmt.Printf("command must be specified.")
+		fmt.Println("command must be specified.")
 		os.Exit(2)
 	}
 
