@@ -97,12 +97,10 @@ func createCertificateAuthority(authorityName string) (*x509.Certificate, crypto
 		Subject: pkix.Name{
 			Organization: []string{authorityName},
 		},
-		NotBefore: time.Now(),
-		NotAfter:  time.Now().Add(time.Hour * 24 * 365 * 10),
-
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(time.Hour * 24 * 365 * 10),
 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
 		IsCA:                  true,
-		MaxPathLen:            1,
 		BasicConstraintsValid: true,
 	}
 
