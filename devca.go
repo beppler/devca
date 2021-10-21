@@ -46,11 +46,13 @@ func handleInit() {
 	if _, err := os.Stat("ca.crt"); err == nil {
 		fmt.Println("certificate authority already exist")
 	}
+
 	caCert, caKey, err := createCertificateAuthority(caName)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+
 	err = saveCertificateAndPrivateKey(caCert, "ca.crt", caKey, "ca.key")
 	if err != nil {
 		fmt.Println(err)
@@ -59,34 +61,31 @@ func handleInit() {
 }
 
 func handleServer() {
-	const ValidHostName = `^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$`
-
 	if len(os.Args) < 3 {
 		fmt.Println("host name must be specified.")
 		os.Exit(2)
 	}
-	hostName := os.Args[2]
-	if matched, _ := regexp.MatchString(ValidHostName, hostName); !matched {
-		fmt.Println("invalid host name.")
-		os.Exit(2)
-	}
+
 	caCert, caKey, err := loadCertificateAndPrivateKey("ca.crt", "ca.key")
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	hostCert, hostKey, err := signHostCertificate(caCert, caKey, hostName)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	baseFileName := hostName + "-" + fmt.Sprintf("%.12x", hostCert.SerialNumber)
-	err = saveCertificateAndPrivateKey(hostCert, baseFileName+".crt", hostKey, baseFileName+".key")
+
+	hostNames := os.Args[2:]
+
+	hostCert, hostKey, err := signHostCertificate(caCert, caKey, hostNames)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
+	baseFileName := hostNames[0] + "-" + fmt.Sprintf("%.12x", hostCert.SerialNumber)
+	err = saveCertificateAndPrivateKey(hostCert, baseFileName+".crt", hostKey, baseFileName+".key")
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 }
 
 func createCertificateAuthority(authorityName string) (*x509.Certificate, crypto.PrivateKey, error) {
@@ -121,7 +120,19 @@ func createCertificateAuthority(authorityName string) (*x509.Certificate, crypto
 	return cert, privateKey, nil
 }
 
-func signHostCertificate(caCertificate *x509.Certificate, caPrivateKey crypto.PrivateKey, hostName string) (*x509.Certificate, crypto.PrivateKey, error) {
+func signHostCertificate(caCertificate *x509.Certificate, caPrivateKey crypto.PrivateKey, hostNames []string) (*x509.Certificate, crypto.PrivateKey, error) {
+	if len(hostNames) < 1 {
+		return nil, nil, fmt.Errorf("at least on host name should be provided")
+	}
+
+	validHostNameRegexp, _ := regexp.Compile(`^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$`)
+
+	for _, hostName := range hostNames {
+		if !validHostNameRegexp.MatchString(hostName) {
+			return nil, nil, fmt.Errorf("invalid host name: %s", hostName)
+		}
+	}
+
 	notBefore := time.Now()
 	notAfter := notBefore.Add(time.Hour * 24 * 365 * 2)
 
@@ -141,9 +152,9 @@ func signHostCertificate(caCertificate *x509.Certificate, caPrivateKey crypto.Pr
 		BasicConstraintsValid: true,
 		SerialNumber:          serialNumber,
 		Subject: pkix.Name{
-			CommonName: hostName,
+			CommonName: hostNames[0],
 		},
-		DNSNames:    []string{hostName},
+		DNSNames:    hostNames,
 		KeyUsage:    x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		NotBefore:   notBefore,
