@@ -77,7 +77,7 @@ func handleServer() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	baseFileName := hostName + "-" + hostCert.SerialNumber.String()
+	baseFileName := hostName + "-" + fmt.Sprintf("%8.8x", hostCert.SerialNumber)
 	err = saveCertificateAndPrivateKey(hostCert, baseFileName+".crt", hostKey, baseFileName+".key")
 	if err != nil {
 		fmt.Println(err)
@@ -127,7 +127,7 @@ func signHostCertificate(caCertificate *x509.Certificate, caPrivateKey crypto.Pr
 		return nil, nil, fmt.Errorf("signer certificate will be expired before host certificate")
 	}
 
-	serialNumber := big.NewInt(time.Now().Unix() - caCertificate.NotBefore.Unix())
+	serialNumber := big.NewInt(time.Now().Unix())
 
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
