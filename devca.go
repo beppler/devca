@@ -39,7 +39,7 @@ func main() {
 }
 
 func handleInit() {
-	caName := "Development Certificate Autority"
+	caName := "Local Development Certificate Autority"
 	if len(os.Args) >= 3 {
 		caName = os.Args[2]
 	}
