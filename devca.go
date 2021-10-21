@@ -43,6 +43,9 @@ func handleInit() {
 	if len(os.Args) >= 3 {
 		caName = os.Args[2]
 	}
+	if _, err := os.Stat("ca.crt"); err == nil {
+		fmt.Println("certificate authority already exist")
+	}
 	caCert, caKey, err := createCertificateAuthority(caName)
 	if err != nil {
 		fmt.Println(err)
