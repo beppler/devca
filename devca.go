@@ -39,7 +39,7 @@ func main() {
 }
 
 func handleInit() {
-	caName := "Local Development Certificate Autority"
+	caName := "Local Development CA"
 	if len(os.Args) >= 3 {
 		caName = os.Args[2]
 	}
@@ -98,6 +98,7 @@ func createCertificateAuthority(authorityName string) (*x509.Certificate, crypto
 	template := x509.Certificate{
 		SerialNumber: big.NewInt(1),
 		Subject: pkix.Name{
+			CommonName:   authorityName,
 			Organization: []string{authorityName},
 		},
 		NotBefore:             time.Now(),
