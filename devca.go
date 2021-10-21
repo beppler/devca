@@ -100,7 +100,7 @@ func createCertificateAuthority(authorityName string) (*x509.Certificate, crypto
 		NotBefore: time.Now(),
 		NotAfter:  time.Now().Add(time.Hour * 24 * 365 * 10),
 
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
 		IsCA:                  true,
 		MaxPathLen:            1,
 		BasicConstraintsValid: true,
