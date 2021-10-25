@@ -14,6 +14,7 @@ import (
 	"io/ioutil"
 	"math/big"
 	"os"
+	"os/user"
 	"regexp"
 	"time"
 )
@@ -39,12 +40,19 @@ func main() {
 }
 
 func handleInit() {
+	if _, err := os.Stat("ca.crt"); err == nil {
+		fmt.Println("certificate authority already exist")
+		os.Exit(1)
+	}
+
 	caName := "Local Development CA"
 	if len(os.Args) >= 3 {
 		caName = os.Args[2]
-	}
-	if _, err := os.Stat("ca.crt"); err == nil {
-		fmt.Println("certificate authority already exist")
+	} else {
+		user, err := user.Current()
+		if err == nil && user.Username != "" {
+			caName = user.Username + " " + caName
+		}
 	}
 
 	caCert, caKey, err := createCertificateAuthority(caName)
