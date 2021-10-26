@@ -22,14 +22,16 @@ do
         archive_name+='.tar.gz'
     fi
 
-    echo "CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -o "dist/$output_name" $package"
+    echo "CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -o ""dist/$output_name"" $package"
     CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -o "dist/$output_name" $package
     if [ $? -ne 0 ]; then
         echo 'An error has occurred! Aborting the script execution...'
         exit 1
     fi
-    echo "arc -overwrite archive "dist/$archive_name" "dist/$output_name""
-    go run github.com/mholt/archiver/v3/cmd/arc@latest -overwrite archive "dist/$archive_name" "dist/$output_name"
+    echo "go run github.com/mholt/archiver/v3/cmd/arc@latest -folder-safe=false -overwrite archive ""dist/$archive_name"" ""dist/$output_name"" README.md LICENSE"
+    go run github.com/mholt/archiver/v3/cmd/arc@latest -folder-safe=false -overwrite archive "dist/$archive_name" "dist/$output_name" README.md LICENSE
     rm "dist/$output_name"
+
+    echo ""
 done
 
