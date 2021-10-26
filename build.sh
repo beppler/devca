@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+rm -f "dist/*"
+
 package=`grep module go.mod | cut -d " " -f 2`
 package_split=(${package//\// })
 package_name=${package_split[-1]}
@@ -11,9 +13,13 @@ do
     platform_split=(${platform//\// })
     GOOS=${platform_split[0]}
     GOARCH=${platform_split[1]}
-    output_name=$package_name'-'$GOOS'-'$GOARCH
+    output_name=$package_name
+    archive_name=$package_name'-'$GOOS'-'$GOARCH
     if [ $GOOS = "windows" ]; then
         output_name+='.exe'
+	archive_name+='.zip'
+    else
+        archive_name+='.tar.gz'
     fi
 
     echo "CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -o "dist/$output_name" $package"
@@ -22,5 +28,8 @@ do
         echo 'An error has occurred! Aborting the script execution...'
         exit 1
     fi
+    echo "arc -overwrite archive "dist/$archive_name" "dist/$output_name""
+    go run github.com/mholt/archiver/v3/cmd/arc@latest -overwrite archive "dist/$archive_name" "dist/$output_name"
+    rm "dist/$output_name"
 done
 
