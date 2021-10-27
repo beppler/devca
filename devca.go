@@ -88,7 +88,7 @@ func handleServer() {
 		os.Exit(1)
 	}
 
-	baseFileName := hostNames[0] + "-" + fmt.Sprintf("%.12x", hostCert.SerialNumber)
+	baseFileName := hostNames[0] + "-" + fmt.Sprintf("%x", hostCert.SerialNumber)
 	err = saveCertificateAndPrivateKey(hostCert, baseFileName+".crt", hostKey, baseFileName+".key")
 	if err != nil {
 		fmt.Println(err)
