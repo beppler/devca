@@ -133,7 +133,7 @@ func signHostCertificate(caCertificate *x509.Certificate, caPrivateKey crypto.Pr
 		return nil, nil, fmt.Errorf("at least on host name should be provided")
 	}
 
-	validHostNameRegexp, _ := regexp.Compile(`^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$`)
+	validHostNameRegexp, _ := regexp.Compile(`^((\*|[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$`)
 
 	for _, hostName := range hostNames {
 		if !validHostNameRegexp.MatchString(hostName) {
