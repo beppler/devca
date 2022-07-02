@@ -208,7 +208,7 @@ func loadCertificateAndPrivateKey(certificateName, keyName string) (*x509.Certif
 		return nil, nil, fmt.Errorf("decode private key")
 	}
 
-	privateKey, err := getPrivateKeyFromPEMBlock(keyPemBlock)
+	privateKey, err := parsePrivateKey(keyPemBlock)
 	if err != nil {
 		return nil, nil, fmt.Errorf("parse private key: %w", err)
 	}
@@ -216,7 +216,7 @@ func loadCertificateAndPrivateKey(certificateName, keyName string) (*x509.Certif
 	return certificate, privateKey, nil
 }
 
-func getPrivateKeyFromPEMBlock(pemBlock *pem.Block) (privateKey crypto.PrivateKey, err error) {
+func parsePrivateKey(pemBlock *pem.Block) (privateKey crypto.PrivateKey, err error) {
 	switch pemBlock.Type {
 	case "RSA PRIVATE KEY":
 		privateKey, err = x509.ParsePKCS1PrivateKey(pemBlock.Bytes)
@@ -234,7 +234,7 @@ func saveCertificateAndPrivateKey(certificate *x509.Certificate, certificateName
 	certificateBuffer := &bytes.Buffer{}
 	pem.Encode(certificateBuffer, certificatePEM)
 
-	privateKeyPEM, err := getPEMBlockFromPrivateKey(privateKey)
+	privateKeyPEM, err := marshalPrivateKey(privateKey)
 	if err != nil {
 		return fmt.Errorf("encode private key: %w", err)
 	}
@@ -254,7 +254,7 @@ func saveCertificateAndPrivateKey(certificate *x509.Certificate, certificateName
 	return nil
 }
 
-func getPEMBlockFromPrivateKey(privateKey interface{}) (*pem.Block, error) {
+func marshalPrivateKey(privateKey interface{}) (*pem.Block, error) {
 	switch key := privateKey.(type) {
 	case *rsa.PrivateKey:
 		return &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}, nil
