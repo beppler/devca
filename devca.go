@@ -17,37 +17,45 @@ import (
 	"os/user"
 	"regexp"
 	"time"
+
+	"github.com/alexflint/go-arg"
 )
 
-func main() {
+type initCmd struct {
+	Name string `arg:"positional" help:"certificate authority name"`
+}
 
-	if len(os.Args) < 2 {
-		fmt.Println("command must be specified.")
-		os.Exit(2)
+type serverCmd struct {
+	HostNames []string `arg:"positional" help:"server host names"`
+}
+
+func main() {
+	var args struct {
+		Init   *initCmd   `arg:"subcommand:init" help:"initialize certificate authority"`
+		Server *serverCmd `arg:"subcommand:server" help:"sign server certificate"`
 	}
 
-	command := os.Args[1]
+	parser := arg.MustParse(&args)
 
-	switch command {
-	case "init":
-		handleInit()
-	case "server":
-		handleServer()
+	switch {
+	case args.Init != nil:
+		handleInit(args.Init)
+	case args.Server != nil:
+		handleServer(args.Server)
 	default:
-		fmt.Printf("invalid command %s.\n", command)
-		os.Exit(2)
+		parser.WriteHelp(os.Stdout)
 	}
 }
 
-func handleInit() {
+func handleInit(args *initCmd) {
 	if _, err := os.Stat("ca.crt"); err == nil {
 		fmt.Println("certificate authority already exist")
 		os.Exit(1)
 	}
 
 	caName := "Local Development CA"
-	if len(os.Args) >= 3 {
-		caName = os.Args[2]
+	if args.Name != "" {
+		caName = args.Name
 	} else {
 		user, err := user.Current()
 		if err == nil && user.Username != "" {
@@ -68,9 +76,9 @@ func handleInit() {
 	}
 }
 
-func handleServer() {
-	if len(os.Args) < 3 {
-		fmt.Println("host name must be specified.")
+func handleServer(args *serverCmd) {
+	if len(args.HostNames) < 1 {
+		fmt.Println("at least one host name must be specified.")
 		os.Exit(2)
 	}
 
@@ -80,7 +88,7 @@ func handleServer() {
 		os.Exit(1)
 	}
 
-	hostNames := os.Args[2:]
+	hostNames := args.HostNames
 
 	hostCert, hostKey, err := signHostCertificate(caCert, caKey, hostNames)
 	if err != nil {
