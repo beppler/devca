@@ -11,7 +11,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"os"
 	"os/user"
@@ -191,7 +190,7 @@ func signHostCertificate(caCertificate *x509.Certificate, caPrivateKey crypto.Pr
 }
 
 func loadCertificateAndPrivateKey(certificateName, keyName string) (*x509.Certificate, crypto.PrivateKey, error) {
-	pemBytes, err := ioutil.ReadFile(certificateName)
+	pemBytes, err := os.ReadFile(certificateName)
 	if err != nil {
 		return nil, nil, fmt.Errorf("load certificate: %w", err)
 	}
@@ -206,7 +205,7 @@ func loadCertificateAndPrivateKey(certificateName, keyName string) (*x509.Certif
 		return nil, nil, fmt.Errorf("parse certificate: %w", err)
 	}
 
-	pemBytes, err = ioutil.ReadFile(keyName)
+	pemBytes, err = os.ReadFile(keyName)
 	if err != nil {
 		return nil, nil, fmt.Errorf("load private key: %w", err)
 	}
@@ -249,12 +248,12 @@ func saveCertificateAndPrivateKey(certificate *x509.Certificate, certificateName
 	privateKeyBuffer := &bytes.Buffer{}
 	pem.Encode(privateKeyBuffer, privateKeyPEM)
 
-	err = ioutil.WriteFile(certificateName, certificateBuffer.Bytes(), 0640)
+	err = os.WriteFile(certificateName, certificateBuffer.Bytes(), 0640)
 	if err != nil {
 		return fmt.Errorf("write certificate: %w", err)
 	}
 
-	err = ioutil.WriteFile(keyName, privateKeyBuffer.Bytes(), 0640)
+	err = os.WriteFile(keyName, privateKeyBuffer.Bytes(), 0640)
 	if err != nil {
 		return fmt.Errorf("write private key: %w", err)
 	}
