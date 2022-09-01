@@ -20,33 +20,35 @@ import (
 	"github.com/alexflint/go-arg"
 )
 
-type initCmd struct {
-	Name string `arg:"positional" help:"certificate authority name"`
-}
-
-type serverCmd struct {
-	HostNames []string `arg:"positional" help:"server host names"`
-}
-
 func main() {
-	var args struct {
-		Init   *initCmd   `arg:"subcommand:init" help:"initialize certificate authority"`
-		Server *serverCmd `arg:"subcommand:server" help:"sign server certificate"`
-	}
+	var args rootCmd
 
 	parser := arg.MustParse(&args)
 
 	switch {
 	case args.Init != nil:
-		handleInit(args.Init)
+		args.Init.Handle()
 	case args.Server != nil:
-		handleServer(args.Server)
+		args.Server.Handle()
 	default:
 		parser.WriteHelp(os.Stdout)
 	}
 }
 
-func handleInit(args *initCmd) {
+type rootCmd struct {
+	Init   *initCmd   `arg:"subcommand:init" help:"Initialize Certificate Authority"`
+	Server *serverCmd `arg:"subcommand:server" help:"Sign Server Certificate"`
+}
+
+func (args *rootCmd) Description() string {
+	return "Manages Certificate Authorities and Server Certificates for development."
+}
+
+type initCmd struct {
+	Name string `arg:"positional" help:"certificate authority name"`
+}
+
+func (args *initCmd) Handle() {
 	if _, err := os.Stat("ca.crt"); err == nil {
 		fmt.Println("certificate authority already exist")
 		os.Exit(1)
@@ -75,7 +77,11 @@ func handleInit(args *initCmd) {
 	}
 }
 
-func handleServer(args *serverCmd) {
+type serverCmd struct {
+	HostNames []string `arg:"positional" help:"server host names"`
+}
+
+func (args *serverCmd) Handle() {
 	if len(args.HostNames) < 1 {
 		fmt.Println("at least one host name must be specified.")
 		os.Exit(2)

@@ -1,6 +1,6 @@
 # DevCA
 
-Generates Certificate Authorities and Server Certificates for development.
+Manages Certificate Authorities and Server Certificates for development.
 
 ## Usage
 
