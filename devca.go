@@ -13,54 +13,69 @@ import (
 	"fmt"
 	"math/big"
 	"os"
-	"os/user"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/alexflint/go-arg"
 )
 
 func main() {
-	var args rootCmd
+	var command rootCommand
 
-	parser := arg.MustParse(&args)
+	parser := arg.MustParse(&command)
 
-	switch {
-	case args.Init != nil:
-		args.Init.Handle()
-	case args.Server != nil:
-		args.Server.Handle()
-	default:
+	if parser.Subcommand() == nil {
 		parser.WriteHelp(os.Stdout)
+		os.Exit(-1)
+	}
+
+	err := command.Handle()
+
+	if err != nil {
+		parser.FailSubcommand(err.Error(), parser.SubcommandNames()...)
 	}
 }
 
-type rootCmd struct {
-	Init   *initCmd   `arg:"subcommand:init" help:"Initialize Certificate Authority"`
-	Server *serverCmd `arg:"subcommand:server" help:"Sign Server Certificate"`
+type rootCommand struct {
+	Init   *initCommand   `arg:"subcommand:init" help:"Initialize Certificate Authority"`
+	Server *serverCommand `arg:"subcommand:server" help:"Sign Server Certificate"`
 }
 
-func (args *rootCmd) Description() string {
-	return "Manages Certificate Authorities and Server Certificates for development."
+func (cmd *rootCommand) Description() string {
+	return "Manages Certificate Authorities and Certificates for development."
 }
 
-type initCmd struct {
-	Name string `arg:"positional" help:"certificate authority name"`
+func (cmd *rootCommand) Handle() error {
+	switch {
+	case cmd.Init != nil:
+		return cmd.Init.Handle()
+	case cmd.Server != nil:
+		return cmd.Server.Handle()
+	default:
+		return nil
+	}
 }
 
-func (args *initCmd) Handle() {
-	if _, err := os.Stat("ca.crt"); err == nil {
-		fmt.Println("certificate authority already exist")
-		os.Exit(1)
+type initCommand struct {
+	Name  string `arg:"positional" help:"certificate authority name"`
+	Force bool   `arg:"-f,--force" help:"allow overwrite of the authority certificate"`
+}
+
+func (cmd *initCommand) Handle() error {
+	if !cmd.Force {
+		if _, err := os.Stat("ca.crt"); err == nil {
+			return fmt.Errorf("certificate authority already exist")
+		}
 	}
 
 	caName := "Local Development CA"
-	if args.Name != "" {
-		caName = args.Name
+	if cmd.Name != "" {
+		caName = cmd.Name
 	} else {
-		user, err := user.Current()
-		if err == nil && user.Username != "" {
-			caName = user.Username + " " + caName
+		hostname, err := os.Hostname()
+		if err == nil && hostname != "" {
+			caName = strings.ToUpper(hostname) + " Development CA"
 		}
 	}
 
@@ -72,41 +87,36 @@ func (args *initCmd) Handle() {
 
 	err = saveCertificateAndPrivateKey(caCert, "ca.crt", caKey, "ca.key")
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-}
-
-type serverCmd struct {
-	HostNames []string `arg:"positional" help:"server host names"`
-}
-
-func (args *serverCmd) Handle() {
-	if len(args.HostNames) < 1 {
-		fmt.Println("at least one host name must be specified.")
-		os.Exit(2)
+		return fmt.Errorf("could not save CA certificate: %w", err)
 	}
 
+	return nil
+}
+
+type serverCommand struct {
+	HostName []string `arg:"positional,required" help:"server host names"`
+}
+
+func (cmd *serverCommand) Handle() error {
 	caCert, caKey, err := loadCertificateAndPrivateKey("ca.crt", "ca.key")
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return fmt.Errorf("could not load signer certificate: %w", err)
 	}
 
-	hostNames := args.HostNames
+	hostNames := cmd.HostName
 
 	hostCert, hostKey, err := signHostCertificate(caCert, caKey, hostNames)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return fmt.Errorf("could not sign server certificate: %w", err)
 	}
 
 	baseFileName := hostNames[0] + "-" + fmt.Sprintf("%x", hostCert.SerialNumber)
 	err = saveCertificateAndPrivateKey(hostCert, baseFileName+".crt", hostKey, baseFileName+".key")
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return fmt.Errorf("could not save server certificate: %w", err)
 	}
+
+	return nil
 }
 
 func createCertificateAuthority(authorityName string) (*x509.Certificate, crypto.PrivateKey, error) {
@@ -161,7 +171,7 @@ func signHostCertificate(caCertificate *x509.Certificate, caPrivateKey crypto.Pr
 		return nil, nil, fmt.Errorf("signer certificate will be expired before host certificate")
 	}
 
-	serialNumber := big.NewInt(time.Now().Unix())
+	serialNumber := big.NewInt(notBefore.Unix())
 
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -237,7 +247,7 @@ func parsePrivateKey(pemBlock *pem.Block) (privateKey crypto.PrivateKey, err err
 		privateKey, err = x509.ParseECPrivateKey(pemBlock.Bytes)
 	default:
 		privateKey = nil
-		err = fmt.Errorf("unsupported private key type")
+		err = fmt.Errorf("unsupported private key type: %s", pemBlock.Type)
 	}
 	return
 }
