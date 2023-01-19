@@ -205,8 +205,8 @@ func signHostCertificate(caCertificate *x509.Certificate, caPrivateKey crypto.Pr
 	return cert, privateKey, nil
 }
 
-func loadCertificateAndPrivateKey(certificateName, keyName string) (*x509.Certificate, crypto.PrivateKey, error) {
-	pemBytes, err := os.ReadFile(certificateName)
+func loadCertificateAndPrivateKey(certificateFileName, keyFileName string) (*x509.Certificate, crypto.PrivateKey, error) {
+	pemBytes, err := os.ReadFile(certificateFileName)
 	if err != nil {
 		return nil, nil, fmt.Errorf("load certificate: %w", err)
 	}
@@ -221,7 +221,7 @@ func loadCertificateAndPrivateKey(certificateName, keyName string) (*x509.Certif
 		return nil, nil, fmt.Errorf("parse certificate: %w", err)
 	}
 
-	pemBytes, err = os.ReadFile(keyName)
+	pemBytes, err = os.ReadFile(keyFileName)
 	if err != nil {
 		return nil, nil, fmt.Errorf("load private key: %w", err)
 	}
@@ -252,7 +252,7 @@ func parsePrivateKey(pemBlock *pem.Block) (privateKey crypto.PrivateKey, err err
 	return
 }
 
-func saveCertificateAndPrivateKey(certificate *x509.Certificate, certificateName string, privateKey crypto.PrivateKey, keyName string) error {
+func saveCertificateAndPrivateKey(certificate *x509.Certificate, certificateFileName string, privateKey crypto.PrivateKey, keyFileName string) error {
 	certificatePEM := &pem.Block{Type: "CERTIFICATE", Bytes: certificate.Raw}
 	certificateBuffer := &bytes.Buffer{}
 	pem.Encode(certificateBuffer, certificatePEM)
@@ -264,12 +264,12 @@ func saveCertificateAndPrivateKey(certificate *x509.Certificate, certificateName
 	privateKeyBuffer := &bytes.Buffer{}
 	pem.Encode(privateKeyBuffer, privateKeyPEM)
 
-	err = os.WriteFile(certificateName, certificateBuffer.Bytes(), 0640)
+	err = os.WriteFile(certificateFileName, certificateBuffer.Bytes(), 0640)
 	if err != nil {
 		return fmt.Errorf("write certificate: %w", err)
 	}
 
-	err = os.WriteFile(keyName, privateKeyBuffer.Bytes(), 0640)
+	err = os.WriteFile(keyFileName, privateKeyBuffer.Bytes(), 0640)
 	if err != nil {
 		return fmt.Errorf("write private key: %w", err)
 	}
