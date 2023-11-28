@@ -2,8 +2,6 @@
 
 Manages Certificate Authorities and Server Certificates for development.
 
-This repository has been deprecated, if you want a utility that do everything this does and more see [simpleca](https://github.com/beppler/simpleca).
-
 ## Usage
 
 ### Initialize Certificate Authority
