@@ -58,8 +58,9 @@ func (cmd *rootCommand) Handle() error {
 }
 
 type initCommand struct {
-	Name  string `arg:"positional" help:"certificate authority name"`
-	Force bool   `arg:"-f,--force" help:"allow overwrite of the authority certificate"`
+	Name    string   `arg:"positional" help:"certificate authority name"`
+	Force   bool     `arg:"-f,--force" help:"allow overwrite of the authority certificate"`
+	Domains []string `arg:"-d,--domain" help:"domain name constraints"`
 }
 
 func (cmd *initCommand) Handle() error {
@@ -79,7 +80,7 @@ func (cmd *initCommand) Handle() error {
 		}
 	}
 
-	caCert, caKey, err := createCertificateAuthority(caName)
+	caCert, caKey, err := createCertificateAuthority(caName, cmd.Domains)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -119,7 +120,7 @@ func (cmd *serverCommand) Handle() error {
 	return nil
 }
 
-func createCertificateAuthority(authorityName string) (*x509.Certificate, crypto.PrivateKey, error) {
+func createCertificateAuthority(authorityName string, domains []string) (*x509.Certificate, crypto.PrivateKey, error) {
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return nil, nil, fmt.Errorf("create CA private key: %w", err)
@@ -131,11 +132,14 @@ func createCertificateAuthority(authorityName string) (*x509.Certificate, crypto
 			CommonName:   authorityName,
 			Organization: []string{authorityName},
 		},
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().Add(time.Hour * 24 * 365 * 10),
-		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
-		IsCA:                  true,
-		BasicConstraintsValid: true,
+		NotBefore:                   time.Now(),
+		NotAfter:                    time.Now().Add(time.Hour * 24 * 365 * 10),
+		KeyUsage:                    x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+		IsCA:                        true,
+		MaxPathLen:                  1,
+		BasicConstraintsValid:       true,
+		PermittedDNSDomainsCritical: len(domains) > 0,
+		PermittedDNSDomains:         domains,
 	}
 
 	certBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
