@@ -30,3 +30,5 @@ devca-*
 *.crt
 *.key
 /dist/
+
+.vscode/
