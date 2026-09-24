@@ -12,6 +12,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"math/big"
+	"net"
 	"os"
 	"regexp"
 	"time"
@@ -47,6 +48,10 @@ func (cmd *rootCommand) Description() string {
 	return "Manages Certificate Authorities and Certificates for development."
 }
 
+func (cmd *rootCommand) Epilogue() string {
+	return "For more information visit https://github.com/beppler/devca"
+}
+
 func (cmd *rootCommand) Handle() error {
 	switch {
 	case cmd.Init != nil:
@@ -59,9 +64,10 @@ func (cmd *rootCommand) Handle() error {
 }
 
 type initCommand struct {
-	Name    string   `arg:"positional" help:"certificate authority name"`
-	Force   bool     `arg:"-f,--force" help:"allow overwrite of the authority certificate"`
-	Domains []string `arg:"-d,--domain" help:"domain name constraints"`
+	Name     string   `arg:"positional" help:"Certificate authority name"`
+	Force    bool     `arg:"-f,--force" help:"Allow overwrite of the authority certificate"`
+	Domains  []string `arg:"-d,--domain,separate" help:"Allowed domains for the authority"`
+	Networks []string `arg:"-n,--network,separate" help:"Allowed networks for the authority"`
 }
 
 func (cmd *initCommand) Handle() error {
@@ -81,7 +87,16 @@ func (cmd *initCommand) Handle() error {
 		}
 	}
 
-	caCert, caKey, err := createCertificateAuthority(caName, cmd.Domains)
+	var networks []*net.IPNet
+	for _, network := range cmd.Networks {
+		_, ipNet, err := net.ParseCIDR(network)
+		if err != nil {
+			return fmt.Errorf("invalid network constraint: %s", network)
+		}
+		networks = append(networks, ipNet)
+	}
+
+	caCert, caKey, err := createCertificateAuthority(caName, cmd.Domains, networks)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -96,7 +111,8 @@ func (cmd *initCommand) Handle() error {
 }
 
 type serverCommand struct {
-	HostName []string `arg:"positional,required" help:"server host names"`
+	HostName []string `arg:"positional,required" help:"Server host names"`
+	IPs      []string `arg:"-i,--ip,separate" help:"Server IP addresses"`
 }
 
 func (cmd *serverCommand) Handle() error {
@@ -107,7 +123,16 @@ func (cmd *serverCommand) Handle() error {
 
 	hostNames := cmd.HostName
 
-	hostCert, hostKey, err := signHostCertificate(caCert, caKey, hostNames)
+	var ipAddresses []net.IP
+	for _, ip := range cmd.IPs {
+		parsedIP := net.ParseIP(ip)
+		if parsedIP == nil {
+			return fmt.Errorf("invalid IP address: %s", ip)
+		}
+		ipAddresses = append(ipAddresses, parsedIP)
+	}
+
+	hostCert, hostKey, err := signServerCertificate(caCert, caKey, hostNames, ipAddresses)
 	if err != nil {
 		return fmt.Errorf("could not sign server certificate: %w", err)
 	}
@@ -121,17 +146,21 @@ func (cmd *serverCommand) Handle() error {
 	return nil
 }
 
-func createCertificateAuthority(authorityName string, domains []string) (*x509.Certificate, crypto.PrivateKey, error) {
+func createCertificateAuthority(authorityName string, domains []string, networks []*net.IPNet) (*x509.Certificate, crypto.PrivateKey, error) {
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return nil, nil, fmt.Errorf("create CA private key: %w", err)
 	}
 
+	var excludedNetworks []*net.IPNet
+	if len(domains) > 0 && len(networks) == 0 {
+		excludedNetworks = []*net.IPNet{{IP: net.IPv4zero, Mask: net.CIDRMask(0, 32)}, {IP: net.IPv6zero, Mask: net.CIDRMask(0, 128)}}
+	}
+
 	template := x509.Certificate{
 		SerialNumber: big.NewInt(1),
 		Subject: pkix.Name{
-			CommonName:   authorityName,
-			Organization: []string{authorityName},
+			CommonName: authorityName,
 		},
 		NotBefore:                   time.Now(),
 		NotAfter:                    time.Now().Add(time.Hour * 24 * 365 * 10),
@@ -141,6 +170,11 @@ func createCertificateAuthority(authorityName string, domains []string) (*x509.C
 		BasicConstraintsValid:       true,
 		PermittedDNSDomainsCritical: len(domains) > 0,
 		PermittedDNSDomains:         domains,
+		PermittedIPRanges:           networks,
+	}
+
+	if len(excludedNetworks) > 0 {
+		template.ExcludedIPRanges = excludedNetworks
 	}
 
 	certBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
@@ -156,7 +190,7 @@ func createCertificateAuthority(authorityName string, domains []string) (*x509.C
 	return cert, privateKey, nil
 }
 
-func signHostCertificate(caCertificate *x509.Certificate, caPrivateKey crypto.PrivateKey, hostNames []string) (*x509.Certificate, crypto.PrivateKey, error) {
+func signServerCertificate(caCertificate *x509.Certificate, caPrivateKey crypto.PrivateKey, hostNames []string, ips []net.IP) (*x509.Certificate, crypto.PrivateKey, error) {
 	if len(hostNames) < 1 {
 		return nil, nil, fmt.Errorf("at least on host name should be provided")
 	}
@@ -191,6 +225,7 @@ func signHostCertificate(caCertificate *x509.Certificate, caPrivateKey crypto.Pr
 			CommonName: hostNames[0],
 		},
 		DNSNames:    hostNames,
+		IPAddresses: ips,
 		KeyUsage:    x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		NotBefore:   notBefore,
