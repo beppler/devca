@@ -11,6 +11,7 @@ To initialize certificate authority create a directory and run `devca init` on i
 ```shell
 mkdir my-dev-ca
 cd my-dev-ca
+
 devca init
 ```
 
