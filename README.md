@@ -2,6 +2,16 @@
 
 Manages Certificate Authorities and Server Certificates for development.
 
+## Install
+
+Binaries can be downloaded from github releases or can be compiled using `build.sh` script.
+
+If you have go on your system you can install it using:
+
+```shell
+go install github.com/beppler/devca@latest
+```
+
 ## Usage
 
 ### Initialize Certificate Authority
@@ -29,7 +39,3 @@ devca server example.com
 ```
 
 This command will create files `hostname-serial.crt` and `hostname-serial.key` with certificate and private key for the server.
-
-## Install
-
-Binaries can be downloaded from github releases or can be compiled using `build.sh` script.
