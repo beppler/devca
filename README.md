@@ -4,13 +4,19 @@ Manages Certificate Authorities and Server Certificates for development.
 
 ## Install
 
-Binaries can be downloaded from github releases or can be compiled using `build.sh` script.
-
-If you have go on your system you can install it using:
+If you have go on your system you can install it using
 
 ```shell
 go install github.com/beppler/devca@latest
 ```
+
+Or you can compile it by cloning this repository and running:
+
+```shell
+go build
+```
+
+Or you can compile it using `build.sh` script that generates binaries for multiple systems and architectures.
 
 ## Usage
 
