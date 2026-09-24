@@ -17,7 +17,7 @@ do
     archive_name=$package_name'-'$GOOS'-'$GOARCH
     if [ $GOOS = "windows" ]; then
         output_name+='.exe'
-	archive_name+='.zip'
+        archive_name+='.zip'
     else
         archive_name+='.tar.gz'
     fi
