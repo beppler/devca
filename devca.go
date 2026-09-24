@@ -14,10 +14,11 @@ import (
 	"math/big"
 	"os"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/alexflint/go-arg"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 func main() {
@@ -76,7 +77,7 @@ func (cmd *initCommand) Handle() error {
 	} else {
 		hostname, err := os.Hostname()
 		if err == nil && hostname != "" {
-			caName = strings.ToUpper(hostname) + " Development CA"
+			caName = cases.Title(language.Und, cases.NoLower).String(hostname) + " Development CA"
 		}
 	}
 
