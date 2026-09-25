@@ -273,8 +273,6 @@ var hostNameProfile = idna.New(
 	idna.BidiRule(),
 )
 
-// normalizeHostName validates a host name and converts it to its lowercase
-// ASCII form. A leading "*." wildcard label is allowed and preserved.
 func normalizeHostName(name string) (string, error) {
 	prefix, rest := "", name
 	if after, ok := strings.CutPrefix(name, "*."); ok {
