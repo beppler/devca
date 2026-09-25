@@ -1,12 +1,10 @@
 package main
 
 import (
-	"bytes"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -327,6 +325,8 @@ func loadCertificateAndPrivateKey(certificateFileName, keyFileName string) (*x50
 
 func parsePrivateKey(pemBlock *pem.Block) (privateKey crypto.PrivateKey, err error) {
 	switch pemBlock.Type {
+	case "PRIVATE KEY":
+		privateKey, err = x509.ParsePKCS8PrivateKey(pemBlock.Bytes)
 	case "RSA PRIVATE KEY":
 		privateKey, err = x509.ParsePKCS1PrivateKey(pemBlock.Bytes)
 	case "EC PRIVATE KEY":
@@ -339,41 +339,43 @@ func parsePrivateKey(pemBlock *pem.Block) (privateKey crypto.PrivateKey, err err
 }
 
 func saveCertificateAndPrivateKey(certificate *x509.Certificate, certificateFileName string, privateKey crypto.PrivateKey, keyFileName string) error {
-	certificatePEM := &pem.Block{Type: "CERTIFICATE", Bytes: certificate.Raw}
-	certificateBuffer := &bytes.Buffer{}
-	pem.Encode(certificateBuffer, certificatePEM)
+	certificateBytes := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certificate.Raw})
+	if certificateBytes == nil {
+		return fmt.Errorf("encode certificate")
+	}
 
 	privateKeyPEM, err := marshalPrivateKey(privateKey)
 	if err != nil {
 		return fmt.Errorf("encode private key: %w", err)
 	}
-	privateKeyBuffer := &bytes.Buffer{}
-	pem.Encode(privateKeyBuffer, privateKeyPEM)
+	privateKeyBytes := pem.EncodeToMemory(privateKeyPEM)
+	if privateKeyBytes == nil {
+		return fmt.Errorf("encode private key")
+	}
 
-	err = os.WriteFile(certificateFileName, certificateBuffer.Bytes(), 0640)
+	err = os.WriteFile(certificateFileName, certificateBytes, 0640)
 	if err != nil {
 		return fmt.Errorf("write certificate: %w", err)
 	}
 
-	err = os.WriteFile(keyFileName, privateKeyBuffer.Bytes(), 0640)
+	err = os.WriteFile(keyFileName, privateKeyBytes, 0600)
 	if err != nil {
 		return fmt.Errorf("write private key: %w", err)
+	}
+
+	// WriteFile keeps the mode of an existing file (e.g. init --force).
+	err = os.Chmod(keyFileName, 0600)
+	if err != nil {
+		return fmt.Errorf("set private key permissions: %w", err)
 	}
 
 	return nil
 }
 
-func marshalPrivateKey(privateKey interface{}) (*pem.Block, error) {
-	switch key := privateKey.(type) {
-	case *rsa.PrivateKey:
-		return &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}, nil
-	case *ecdsa.PrivateKey:
-		keyBytes, err := x509.MarshalECPrivateKey(key)
-		if err != nil {
-			return nil, fmt.Errorf("marshal ECDSA private key: %w", err)
-		}
-		return &pem.Block{Type: "EC PRIVATE KEY", Bytes: keyBytes}, nil
-	default:
-		return nil, fmt.Errorf("unsupported private key type")
+func marshalPrivateKey(privateKey crypto.PrivateKey) (*pem.Block, error) {
+	keyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	if err != nil {
+		return nil, fmt.Errorf("marshal private key: %w", err)
 	}
+	return &pem.Block{Type: "PRIVATE KEY", Bytes: keyBytes}, nil
 }
