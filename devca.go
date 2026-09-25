@@ -131,8 +131,8 @@ func (cmd *issueCommand) Handle() error {
 }
 
 type serverCommand struct {
-	HostName []string `arg:"positional,required" help:"Server host names"`
-	IPs      []string `arg:"-i,--ip,separate" help:"Server IP addresses"`
+	HostName  []string `arg:"positional,required" help:"Server host names"`
+	IPAddress []string `arg:"-i,--ip,separate" help:"Server IP addresses"`
 }
 
 func (cmd *serverCommand) Handle() error {
@@ -144,12 +144,12 @@ func (cmd *serverCommand) Handle() error {
 	hostNames := cmd.HostName
 
 	var ipAddresses []net.IP
-	for _, ip := range cmd.IPs {
-		parsedIP := net.ParseIP(ip)
-		if parsedIP == nil {
-			return fmt.Errorf("invalid IP address: %s", ip)
+	for _, ipAddress := range cmd.IPAddress {
+		parsed := net.ParseIP(ipAddress)
+		if parsed == nil {
+			return fmt.Errorf("invalid IP address: %s", ipAddress)
 		}
-		ipAddresses = append(ipAddresses, parsedIP)
+		ipAddresses = append(ipAddresses, parsed)
 	}
 
 	hostCert, hostKey, err := signServerCertificate(caCert, caKey, hostNames, ipAddresses)
@@ -246,11 +246,14 @@ func signServerCertificate(caCertificate *x509.Certificate, caPrivateKey crypto.
 			CommonName: dnsNames[0],
 		},
 		DNSNames:    dnsNames,
-		IPAddresses: ips,
 		KeyUsage:    x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		NotBefore:   notBefore,
 		NotAfter:    notAfter,
+	}
+
+	if len(ips) > 0 {
+		template.IPAddresses = ips
 	}
 
 	certBytes, err := x509.CreateCertificate(rand.Reader, &template, caCertificate, &privateKey.PublicKey, caPrivateKey)
