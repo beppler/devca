@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
-rm -f "dist/*"
+mkdir -p dist/
+
+rm -f dist/*
 
 package=`grep module go.mod | cut -d " " -f 2`
 package_split=(${package//\// })
