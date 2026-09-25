@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/alexflint/go-arg"
+	"github.com/earthboundkid/versioninfo/v2"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
@@ -51,6 +52,10 @@ func (cmd *rootCommand) Description() string {
 
 func (cmd *rootCommand) Epilogue() string {
 	return "For more information visit https://github.com/beppler/devca"
+}
+
+func (cmd *rootCommand) Version() string {
+	return versioninfo.Short()
 }
 
 func (cmd *rootCommand) Handle() error {
