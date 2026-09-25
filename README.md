@@ -37,11 +37,11 @@ The certificate can be distributed and must be installed on Operating System sto
 
 ### Create Server Certificate
 
-To create a new server certificate, go to directory created on previous step and run `devca server hostname` on it.
+To create a new server certificate, go to directory created on previous step and run `devca issue server hostname` on it.
 
 ```shell
 cd my-dev-ca
-devca server example.com
+devca issue server example.com
 ```
 
 This command will create files `hostname-serial.crt` and `hostname-serial.key` with certificate and private key for the server.

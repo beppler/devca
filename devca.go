@@ -27,8 +27,9 @@ func main() {
 
 	parser := arg.MustParse(&command)
 
-	if parser.Subcommand() == nil {
-		parser.WriteHelp(os.Stdout)
+	switch parser.Subcommand().(type) {
+	case nil, *issueCommand:
+		parser.WriteHelpForSubcommand(os.Stdout, parser.SubcommandNames()...)
 		os.Exit(-1)
 	}
 
@@ -40,8 +41,8 @@ func main() {
 }
 
 type rootCommand struct {
-	Init   *initCommand   `arg:"subcommand:init" help:"Initialize Certificate Authority"`
-	Server *serverCommand `arg:"subcommand:server" help:"Sign Server Certificate"`
+	Init  *initCommand  `arg:"subcommand:init" help:"Initialize Certificate Authority"`
+	Issue *issueCommand `arg:"subcommand:issue" help:"Issue Certificates"`
 }
 
 func (cmd *rootCommand) Description() string {
@@ -56,8 +57,8 @@ func (cmd *rootCommand) Handle() error {
 	switch {
 	case cmd.Init != nil:
 		return cmd.Init.Handle()
-	case cmd.Server != nil:
-		return cmd.Server.Handle()
+	case cmd.Issue != nil:
+		return cmd.Issue.Handle()
 	default:
 		return nil
 	}
@@ -108,6 +109,19 @@ func (cmd *initCommand) Handle() error {
 	}
 
 	return nil
+}
+
+type issueCommand struct {
+	Server *serverCommand `arg:"subcommand:server" help:"Issue Server Certificate"`
+}
+
+func (cmd *issueCommand) Handle() error {
+	switch {
+	case cmd.Server != nil:
+		return cmd.Server.Handle()
+	default:
+		return fmt.Errorf("missing subcommand")
+	}
 }
 
 type serverCommand struct {
@@ -191,8 +205,8 @@ func createCertificateAuthority(authorityName string, domains []string, networks
 }
 
 func signServerCertificate(caCertificate *x509.Certificate, caPrivateKey crypto.PrivateKey, hostNames []string, ips []net.IP) (*x509.Certificate, crypto.PrivateKey, error) {
-	if len(hostNames) < 1 {
-		return nil, nil, fmt.Errorf("at least on host name should be provided")
+	if len(hostNames) < 1 && len(ips) < 1 {
+		return nil, nil, fmt.Errorf("at least on host name or IP should be provided")
 	}
 
 	validHostNameRegexp, _ := regexp.Compile(`^((\*|[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$`)
