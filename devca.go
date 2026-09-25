@@ -14,11 +14,12 @@ import (
 	"math/big"
 	"net"
 	"os"
-	"regexp"
+	"strings"
 	"time"
 
 	"github.com/alexflint/go-arg"
 	"github.com/earthboundkid/versioninfo/v2"
+	"golang.org/x/net/idna"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
@@ -211,15 +212,16 @@ func createCertificateAuthority(authorityName string, domains []string, networks
 
 func signServerCertificate(caCertificate *x509.Certificate, caPrivateKey crypto.PrivateKey, hostNames []string, ips []net.IP) (*x509.Certificate, crypto.PrivateKey, error) {
 	if len(hostNames) < 1 && len(ips) < 1 {
-		return nil, nil, fmt.Errorf("at least on host name or IP should be provided")
+		return nil, nil, fmt.Errorf("at least one host name or IP should be provided")
 	}
 
-	validHostNameRegexp, _ := regexp.Compile(`^((\*|[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$`)
-
+	dnsNames := make([]string, 0, len(hostNames))
 	for _, hostName := range hostNames {
-		if !validHostNameRegexp.MatchString(hostName) {
-			return nil, nil, fmt.Errorf("invalid host name: %s", hostName)
+		dnsName, err := normalizeHostName(hostName)
+		if err != nil {
+			return nil, nil, err
 		}
+		dnsNames = append(dnsNames, dnsName)
 	}
 
 	notBefore := time.Now()
@@ -241,9 +243,9 @@ func signServerCertificate(caCertificate *x509.Certificate, caPrivateKey crypto.
 		BasicConstraintsValid: true,
 		SerialNumber:          serialNumber,
 		Subject: pkix.Name{
-			CommonName: hostNames[0],
+			CommonName: dnsNames[0],
 		},
-		DNSNames:    hostNames,
+		DNSNames:    dnsNames,
 		IPAddresses: ips,
 		KeyUsage:    x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
@@ -262,6 +264,28 @@ func signServerCertificate(caCertificate *x509.Certificate, caPrivateKey crypto.
 	}
 
 	return cert, privateKey, nil
+}
+
+var hostNameProfile = idna.New(
+	idna.MapForLookup(),
+	idna.VerifyDNSLength(true),
+	idna.BidiRule(),
+)
+
+// normalizeHostName validates a host name and converts it to its lowercase
+// ASCII form. A leading "*." wildcard label is allowed and preserved.
+func normalizeHostName(name string) (string, error) {
+	prefix, rest := "", name
+	if after, ok := strings.CutPrefix(name, "*."); ok {
+		prefix, rest = "*.", after
+	}
+
+	ascii, err := hostNameProfile.ToASCII(rest)
+	if err != nil {
+		return "", fmt.Errorf("invalid host name %q: %w", name, err)
+	}
+
+	return prefix + ascii, nil
 }
 
 func loadCertificateAndPrivateKey(certificateFileName, keyFileName string) (*x509.Certificate, crypto.PrivateKey, error) {

@@ -5,6 +5,7 @@ go 1.26.0
 require (
 	github.com/alexflint/go-arg v1.6.1
 	github.com/earthboundkid/versioninfo/v2 v2.24.1
+	golang.org/x/net v0.59.0
 	golang.org/x/text v0.42.0
 )
 
