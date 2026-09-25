@@ -101,7 +101,7 @@ func (cmd *initCommand) Handle() error {
 		networks = append(networks, ipNet)
 	}
 
-	caCert, caKey, err := createCertificateAuthority(caName, cmd.Domains, networks)
+	caCert, caKey, err := initializeCertificateAuthority(caName, cmd.Domains, networks)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -164,7 +164,7 @@ func (cmd *serverCommand) Handle() error {
 	return nil
 }
 
-func createCertificateAuthority(authorityName string, domains []string, networks []*net.IPNet) (*x509.Certificate, crypto.PrivateKey, error) {
+func initializeCertificateAuthority(authorityName string, domains []string, networks []*net.IPNet) (*x509.Certificate, crypto.PrivateKey, error) {
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return nil, nil, fmt.Errorf("create CA private key: %w", err)
