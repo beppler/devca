@@ -1,27 +1,17 @@
 package main
 
 import (
-	"crypto"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
 	"fmt"
-	"math/big"
 	"net"
 	"os"
-	"strings"
-	"time"
 
 	"github.com/alexflint/go-arg"
+	"github.com/beppler/devca/internal/ca"
+	"github.com/beppler/devca/internal/pemfile"
 	"github.com/earthboundkid/versioninfo/v2"
-	"golang.org/x/net/idna"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
-
 func main() {
 	var command rootCommand
 
@@ -101,13 +91,12 @@ func (cmd *initCommand) Handle() error {
 		networks = append(networks, ipNet)
 	}
 
-	caCert, caKey, err := initializeCertificateAuthority(caName, cmd.Domains, networks)
+	caCert, caKey, err := ca.NewCertificateAuthority(caName, cmd.Domains, networks)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return fmt.Errorf("could not create CA certificate: %w", err)
 	}
 
-	err = saveCertificateAndPrivateKey(caCert, "ca.crt", caKey, "ca.key")
+	err = pemfile.Save(caCert, "ca.crt", caKey, "ca.key")
 	if err != nil {
 		return fmt.Errorf("could not save CA certificate: %w", err)
 	}
@@ -134,7 +123,7 @@ type serverCommand struct {
 }
 
 func (cmd *serverCommand) Handle() error {
-	caCert, caKey, err := loadCertificateAndPrivateKey("ca.crt", "ca.key")
+	caCert, caKey, err := pemfile.Load("ca.crt", "ca.key")
 	if err != nil {
 		return fmt.Errorf("could not load signer certificate: %w", err)
 	}
@@ -150,230 +139,16 @@ func (cmd *serverCommand) Handle() error {
 		ipAddresses = append(ipAddresses, parsed)
 	}
 
-	hostCert, hostKey, err := issueServerCertificate(caCert, caKey, hostNames, ipAddresses)
+	hostCert, hostKey, err := ca.IssueServer(caCert, caKey, hostNames, ipAddresses)
 	if err != nil {
 		return fmt.Errorf("could not sign server certificate: %w", err)
 	}
 
 	baseFileName := hostNames[0] + "-" + fmt.Sprintf("%x", hostCert.SerialNumber)
-	err = saveCertificateAndPrivateKey(hostCert, baseFileName+".crt", hostKey, baseFileName+".key")
+	err = pemfile.Save(hostCert, baseFileName+".crt", hostKey, baseFileName+".key")
 	if err != nil {
 		return fmt.Errorf("could not save server certificate: %w", err)
 	}
 
 	return nil
-}
-
-func initializeCertificateAuthority(authorityName string, domains []string, networks []*net.IPNet) (*x509.Certificate, crypto.PrivateKey, error) {
-	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		return nil, nil, fmt.Errorf("create CA private key: %w", err)
-	}
-
-	var excludedNetworks []*net.IPNet
-	if len(domains) > 0 && len(networks) == 0 {
-		excludedNetworks = []*net.IPNet{{IP: net.IPv4zero, Mask: net.CIDRMask(0, 32)}, {IP: net.IPv6zero, Mask: net.CIDRMask(0, 128)}}
-	}
-
-	template := x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{
-			CommonName: authorityName,
-		},
-		NotBefore:                   time.Now(),
-		NotAfter:                    time.Now().Add(time.Hour * 24 * 365 * 10),
-		KeyUsage:                    x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
-		IsCA:                        true,
-		MaxPathLen:                  1,
-		BasicConstraintsValid:       true,
-		PermittedDNSDomainsCritical: len(domains) > 0,
-		PermittedDNSDomains:         domains,
-		PermittedIPRanges:           networks,
-	}
-
-	if len(excludedNetworks) > 0 {
-		template.ExcludedIPRanges = excludedNetworks
-	}
-
-	certBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
-	if err != nil {
-		return nil, nil, fmt.Errorf("create CA certificate: %w", err)
-	}
-
-	cert, err := x509.ParseCertificate(certBytes)
-	if err != nil {
-		return nil, nil, fmt.Errorf("parse CA certificate: %w", err)
-	}
-
-	return cert, privateKey, nil
-}
-
-func issueServerCertificate(caCertificate *x509.Certificate, caPrivateKey crypto.PrivateKey, hostNames []string, ips []net.IP) (*x509.Certificate, crypto.PrivateKey, error) {
-	if len(hostNames) < 1 && len(ips) < 1 {
-		return nil, nil, fmt.Errorf("at least one host name or IP should be provided")
-	}
-
-	dnsNames := make([]string, 0, len(hostNames))
-	for _, hostName := range hostNames {
-		dnsName, err := normalizeHostName(hostName)
-		if err != nil {
-			return nil, nil, err
-		}
-		dnsNames = append(dnsNames, dnsName)
-	}
-
-	notBefore := time.Now()
-	notAfter := notBefore.Add(time.Hour * 24 * 365 * 2)
-
-	if notBefore.After(caCertificate.NotAfter) || notAfter.After(caCertificate.NotAfter) {
-		return nil, nil, fmt.Errorf("ca certificate will be expired before host certificate")
-	}
-
-	serialNumber := big.NewInt(notBefore.Unix())
-
-	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		return nil, nil, fmt.Errorf("create server private key: %w", err)
-	}
-
-	template := x509.Certificate{
-		IsCA:                  false,
-		BasicConstraintsValid: true,
-		SerialNumber:          serialNumber,
-		Subject: pkix.Name{
-			CommonName: dnsNames[0],
-		},
-		DNSNames:    dnsNames,
-		KeyUsage:    x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		NotBefore:   notBefore,
-		NotAfter:    notAfter,
-	}
-
-	if len(ips) > 0 {
-		template.IPAddresses = ips
-	}
-
-	certBytes, err := x509.CreateCertificate(rand.Reader, &template, caCertificate, &privateKey.PublicKey, caPrivateKey)
-	if err != nil {
-		return nil, nil, fmt.Errorf("create server certificate: %w", err)
-	}
-
-	cert, err := x509.ParseCertificate(certBytes)
-	if err != nil {
-		return nil, nil, fmt.Errorf("parse server certificate: %w", err)
-	}
-
-	return cert, privateKey, nil
-}
-
-var hostNameProfile = idna.New(
-	idna.MapForLookup(),
-	idna.VerifyDNSLength(true),
-	idna.BidiRule(),
-)
-
-func normalizeHostName(name string) (string, error) {
-	prefix, rest := "", name
-	if after, ok := strings.CutPrefix(name, "*."); ok {
-		prefix, rest = "*.", after
-	}
-
-	ascii, err := hostNameProfile.ToASCII(rest)
-	if err != nil {
-		return "", fmt.Errorf("invalid host name %q: %w", name, err)
-	}
-
-	return prefix + ascii, nil
-}
-
-func loadCertificateAndPrivateKey(certificateFileName, keyFileName string) (*x509.Certificate, crypto.PrivateKey, error) {
-	pemBytes, err := os.ReadFile(certificateFileName)
-	if err != nil {
-		return nil, nil, fmt.Errorf("load certificate: %w", err)
-	}
-
-	certPemBlock, _ := pem.Decode(pemBytes)
-	if certPemBlock == nil {
-		return nil, nil, fmt.Errorf("decode certificate")
-	}
-
-	certificate, err := x509.ParseCertificate(certPemBlock.Bytes)
-	if err != nil {
-		return nil, nil, fmt.Errorf("parse certificate: %w", err)
-	}
-
-	pemBytes, err = os.ReadFile(keyFileName)
-	if err != nil {
-		return nil, nil, fmt.Errorf("load private key: %w", err)
-	}
-
-	keyPemBlock, _ := pem.Decode(pemBytes)
-	if keyPemBlock == nil {
-		return nil, nil, fmt.Errorf("decode private key")
-	}
-
-	privateKey, err := parsePrivateKey(keyPemBlock)
-	if err != nil {
-		return nil, nil, fmt.Errorf("parse private key: %w", err)
-	}
-
-	return certificate, privateKey, nil
-}
-
-func parsePrivateKey(pemBlock *pem.Block) (privateKey crypto.PrivateKey, err error) {
-	switch pemBlock.Type {
-	case "PRIVATE KEY":
-		privateKey, err = x509.ParsePKCS8PrivateKey(pemBlock.Bytes)
-	case "RSA PRIVATE KEY":
-		privateKey, err = x509.ParsePKCS1PrivateKey(pemBlock.Bytes)
-	case "EC PRIVATE KEY":
-		privateKey, err = x509.ParseECPrivateKey(pemBlock.Bytes)
-	default:
-		privateKey = nil
-		err = fmt.Errorf("unsupported private key type: %s", pemBlock.Type)
-	}
-	return
-}
-
-func saveCertificateAndPrivateKey(certificate *x509.Certificate, certificateFileName string, privateKey crypto.PrivateKey, keyFileName string) error {
-	certificateBytes := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certificate.Raw})
-	if certificateBytes == nil {
-		return fmt.Errorf("encode certificate")
-	}
-
-	privateKeyPEM, err := marshalPrivateKey(privateKey)
-	if err != nil {
-		return fmt.Errorf("encode private key: %w", err)
-	}
-	privateKeyBytes := pem.EncodeToMemory(privateKeyPEM)
-	if privateKeyBytes == nil {
-		return fmt.Errorf("encode private key")
-	}
-
-	err = os.WriteFile(certificateFileName, certificateBytes, 0640)
-	if err != nil {
-		return fmt.Errorf("write certificate: %w", err)
-	}
-
-	err = os.WriteFile(keyFileName, privateKeyBytes, 0600)
-	if err != nil {
-		return fmt.Errorf("write private key: %w", err)
-	}
-
-	// WriteFile keeps the mode of an existing file (e.g. init --force).
-	err = os.Chmod(keyFileName, 0600)
-	if err != nil {
-		return fmt.Errorf("set private key permissions: %w", err)
-	}
-
-	return nil
-}
-
-func marshalPrivateKey(privateKey crypto.PrivateKey) (*pem.Block, error) {
-	keyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
-	if err != nil {
-		return nil, fmt.Errorf("marshal private key: %w", err)
-	}
-	return &pem.Block{Type: "PRIVATE KEY", Bytes: keyBytes}, nil
 }
