@@ -32,8 +32,9 @@ func main() {
 }
 
 type rootCommand struct {
-	Init  *initCommand  `arg:"subcommand:init" help:"Initialize Certificate Authority"`
-	Issue *issueCommand `arg:"subcommand:issue" help:"Issue Certificates"`
+	Init   *initCommand   `arg:"subcommand:init" help:"Initialize Certificate Authority"`
+	Issue  *issueCommand  `arg:"subcommand:issue" help:"Issue Certificates"`
+	Server *serverCommand `arg:"subcommand:server" help:"Issue Server Certificate (backward compatibility, use 'issue server' instead)"`
 }
 
 func (cmd *rootCommand) Description() string {
