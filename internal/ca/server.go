@@ -43,12 +43,19 @@ func IssueServer(caCertificate *x509.Certificate, caPrivateKey crypto.PrivateKey
 		return nil, nil, fmt.Errorf("create server private key: %w", err)
 	}
 
+	var commonName string
+	if len(dnsNames) > 0 {
+		commonName = dnsNames[0]
+	} else {
+		commonName = ips[0].String()
+	}
+
 	template := x509.Certificate{
 		IsCA:                  false,
 		BasicConstraintsValid: true,
 		SerialNumber:          serialNumber,
 		Subject: pkix.Name{
-			CommonName: dnsNames[0],
+			CommonName: commonName,
 		},
 		DNSNames:    dnsNames,
 		KeyUsage:    x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
