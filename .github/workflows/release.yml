@@ -26,7 +26,7 @@ jobs:
           go-version-file: go.mod
 
       - name: Extract release notes from tag
-        run: git tag -l --format='%(contents)' "${GITHUB_REF_NAME}" > "${RUNNER_TEMP}/release-notes.md"
+        run: git tag -l --format='%(contents:subject)%0a%0a%(contents:body)' "${GITHUB_REF_NAME}" > "${RUNNER_TEMP}/release-notes.md"
 
       - uses: goreleaser/goreleaser-action@v7
         with:
