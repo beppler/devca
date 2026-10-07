@@ -29,7 +29,7 @@ jobs:
         run: go test ./...
 
       - name: Extract release notes from tag
-        run: git tag -l --format='%(contents)' "$GITHUB_REF_NAME" > "$RUNNER_TEMP/release-notes.md"
+        run: git tag -l --format='%(contents)' "${GITHUB_REF_NAME}" > "${RUNNER_TEMP}/release-notes.md"
 
       - uses: goreleaser/goreleaser-action@v7
         with:
@@ -38,3 +38,4 @@ jobs:
           args: release --clean --release-notes=${{ runner.temp }}/release-notes.md
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          GORELEASER_CURRENT_TAG: ${{ github.ref_name }}
