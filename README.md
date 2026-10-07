@@ -18,7 +18,11 @@ Or you can compile it by cloning this repository and running:
 go build
 ```
 
-Or you can compile it using `build.sh` script that generates binaries for multiple systems and architectures.
+Or you can build binaries for multiple systems and architectures using [GoReleaser](https://goreleaser.com) (the output goes to `dist/`):
+
+```shell
+goreleaser release --snapshot --clean
+```
 
 ## Usage
 
@@ -50,7 +54,7 @@ This command will create files `hostname-serial.crt` and `hostname-serial.key` w
 
 ## Release
 
-Pushing a tag that starts with `v` (for example `v1.2.0`) triggers the [Release workflow](.github/workflows/release.yml), which builds the binaries with `build.sh` and creates a GitHub release with them attached.
+Pushing a tag that starts with `v` (for example `v1.2.0`) triggers the [Release workflow](.github/workflows/release.yml), which builds the binaries with [GoReleaser](https://goreleaser.com) and creates a GitHub release with them attached.
 
 The release notes are taken from the tag message, so use an annotated tag:
 

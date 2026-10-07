@@ -28,15 +28,14 @@ jobs:
       - name: Test
         run: go test ./...
 
-      - name: Build
-        run: |
-          bash build.sh
+      - name: Extract release notes from tag
+        run: git tag -l --format='%(contents)' "${GITHUB_REF_NAME}" > "${RUNNER_TEMP}/release-notes.md"
 
-      - name: Create release
+      - uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean --release-notes=${{ runner.temp }}/release-notes.md
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release create "$GITHUB_REF_NAME" dist/* \
-            --title "$GITHUB_REF_NAME" \
-            --notes-from-tag \
-            --verify-tag
+          GITHUB_TOKEN: ${{ github.token }}
+          GORELEASER_CURRENT_TAG: ${{ github.ref_name }}
