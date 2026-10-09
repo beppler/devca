@@ -6,9 +6,9 @@ import (
 	"os"
 
 	"github.com/alexflint/go-arg"
-	"github.com/beppler/devca/internal/ca"
-	"github.com/beppler/devca/internal/pemfile"
 	"github.com/earthboundkid/versioninfo/v2"
+	"go.beppler.dev.br/devca/internal/ca"
+	"go.beppler.dev.br/devca/internal/pemfile"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )

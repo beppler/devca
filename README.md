@@ -4,12 +4,12 @@ Manages Certificate Authorities and Server Certificates for development.
 
 ## Install
 
-Pre-built binaries for Windows, Linux and macOS are available on the [GitHub releases page](https://github.com/beppler/devca/releases). Download the archive for your system and architecture (`.zip` for Windows, `.tar.gz` for Linux and macOS), extract it and put the `devca` binary somewhere on your `PATH`.
+Pre-built binaries for Windows, Linux and macOS are available on the [GitHub releases page](https://go.beppler.dev.br/devca/releases). Download the archive for your system and architecture (`.zip` for Windows, `.tar.gz` for Linux and macOS), extract it and put the `devca` binary somewhere on your `PATH`.
 
 Or, if you have go on your system you can install it using
 
 ```shell
-go install github.com/beppler/devca@latest
+go install go.beppler.dev.br/devca@latest
 ```
 
 Or you can compile it by cloning this repository and running:
