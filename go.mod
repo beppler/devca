@@ -1,4 +1,4 @@
-module github.com/beppler/devca
+module go.beppler.dev.br/devca
 
 go 1.26.0
 
