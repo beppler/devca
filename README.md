@@ -52,6 +52,17 @@ devca issue server example.com
 
 This command will create files `hostname-serial.crt` and `hostname-serial.key` with certificate and private key for the server.
 
+### Create Code Signing Certificate
+
+To create a new code signing certificate, go to the certificate authority directory and run `devca issue codesign name` on it. The country (`-c`, two-letter code) and organization (`-o`) are optional.
+
+```shell
+cd my-dev-ca
+devca issue codesign "John Doe" -c US -o "ACME Corp"
+```
+
+This command will create files `name-serial.crt` and `name-serial.key` with certificate and private key for code signing. Characters that are not safe in file names are replaced with `-` (for example `John-Doe-serial.crt`).
+
 ## Release
 
 Pushing a tag that starts with `v` (for example `v1.2.0`) triggers the [Release workflow](.github/workflows/release.yml), which builds the binaries with [GoReleaser](https://goreleaser.com) and creates a GitHub release with them attached.

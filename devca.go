@@ -107,13 +107,16 @@ func (cmd *initCommand) Handle() error {
 }
 
 type issueCommand struct {
-	Server *serverCommand `arg:"subcommand:server" help:"Issue Server Certificate"`
+	Server   *serverCommand   `arg:"subcommand:server" help:"Issue Server Certificate"`
+	CodeSign *codeSignCommand `arg:"subcommand:codesign" help:"Issue Code Signing Certificate"`
 }
 
 func (cmd *issueCommand) Handle() error {
 	switch {
 	case cmd.Server != nil:
 		return cmd.Server.Handle()
+	case cmd.CodeSign != nil:
+		return cmd.CodeSign.Handle()
 	default:
 		return fmt.Errorf("missing subcommand")
 	}
@@ -146,10 +149,36 @@ func (cmd *serverCommand) Handle() error {
 		return fmt.Errorf("could not sign server certificate: %w", err)
 	}
 
-	baseFileName := hostNames[0] + "-" + fmt.Sprintf("%x", hostCert.SerialNumber)
+	baseFileName := ca.FileSafeName(hostNames[0] + "-" + fmt.Sprintf("%x", hostCert.SerialNumber))
 	err = pemfile.Save(hostCert, baseFileName+".crt", hostKey, baseFileName+".key")
 	if err != nil {
 		return fmt.Errorf("could not save server certificate: %w", err)
+	}
+
+	return nil
+}
+
+type codeSignCommand struct {
+	Name         string `arg:"positional,required" help:"Common name of the certificate subject"`
+	Country      string `arg:"-c,--country" help:"Two-letter country code"`
+	Organization string `arg:"-o,--organization" help:"Organization name"`
+}
+
+func (cmd *codeSignCommand) Handle() error {
+	caCert, caKey, err := pemfile.Load("ca.crt", "ca.key")
+	if err != nil {
+		return fmt.Errorf("could not load signer certificate: %w", err)
+	}
+
+	cert, key, err := ca.IssueCodeSigning(caCert, caKey, cmd.Name, cmd.Country, cmd.Organization)
+	if err != nil {
+		return fmt.Errorf("could not sign code signing certificate: %w", err)
+	}
+
+	baseFileName := ca.FileSafeName(cert.Subject.CommonName) + "-" + fmt.Sprintf("%x", cert.SerialNumber)
+	err = pemfile.Save(cert, baseFileName+".crt", key, baseFileName+".key")
+	if err != nil {
+		return fmt.Errorf("could not save code signing certificate: %w", err)
 	}
 
 	return nil
