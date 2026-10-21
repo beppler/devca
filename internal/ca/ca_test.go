@@ -2,6 +2,7 @@ package ca
 
 import (
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/x509"
 	"net"
 	"testing"
@@ -19,7 +20,7 @@ func mustParseCIDR(t *testing.T, s string) *net.IPNet {
 
 func TestNewCertificateAuthority(t *testing.T) {
 	before := time.Now().Truncate(time.Second)
-	cert, key, err := NewCertificateAuthority("Test CA", nil, nil)
+	cert, key, err := NewCertificateAuthority("Test CA", elliptic.P384(), nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +64,7 @@ func TestNewCertificateAuthority(t *testing.T) {
 }
 
 func TestNewCertificateAuthorityDomainsOnlyExcludesAllIPs(t *testing.T) {
-	cert, _, err := NewCertificateAuthority("Test CA", []string{"example.com"}, nil)
+	cert, _, err := NewCertificateAuthority("Test CA", elliptic.P384(), []string{"example.com"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +92,7 @@ func TestNewCertificateAuthorityDomainsOnlyExcludesAllIPs(t *testing.T) {
 
 func TestNewCertificateAuthorityDomainsAndNetworks(t *testing.T) {
 	networks := []*net.IPNet{mustParseCIDR(t, "192.168.0.0/16"), mustParseCIDR(t, "fd00::/8")}
-	cert, _, err := NewCertificateAuthority("Test CA", []string{"example.com", "test"}, networks)
+	cert, _, err := NewCertificateAuthority("Test CA", elliptic.P384(), []string{"example.com", "test"}, networks)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +114,7 @@ func TestNewCertificateAuthorityDomainsAndNetworks(t *testing.T) {
 }
 
 func TestNewCertificateAuthorityNetworksOnly(t *testing.T) {
-	cert, _, err := NewCertificateAuthority("Test CA", nil, []*net.IPNet{mustParseCIDR(t, "10.0.0.0/8")})
+	cert, _, err := NewCertificateAuthority("Test CA", elliptic.P384(), nil, []*net.IPNet{mustParseCIDR(t, "10.0.0.0/8")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,5 +127,53 @@ func TestNewCertificateAuthorityNetworksOnly(t *testing.T) {
 	}
 	if len(cert.ExcludedIPRanges) != 0 {
 		t.Errorf("ExcludedIPRanges = %v, want none", cert.ExcludedIPRanges)
+	}
+}
+
+func TestNewCertificateAuthorityUsesCurve(t *testing.T) {
+	for _, curve := range []elliptic.Curve{elliptic.P256(), elliptic.P384(), elliptic.P521()} {
+		t.Run(curve.Params().Name, func(t *testing.T) {
+			cert, _, err := NewCertificateAuthority("Test CA", curve, nil, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			publicKey, ok := cert.PublicKey.(*ecdsa.PublicKey)
+			if !ok {
+				t.Fatalf("public key type = %T, want *ecdsa.PublicKey", cert.PublicKey)
+			}
+			if publicKey.Curve != curve {
+				t.Errorf("curve = %s, want %s", publicKey.Curve.Params().Name, curve.Params().Name)
+			}
+		})
+	}
+}
+
+func TestParseCurve(t *testing.T) {
+	tests := []struct {
+		name string
+		want elliptic.Curve
+	}{
+		{"p256", elliptic.P256()},
+		{"p384", elliptic.P384()},
+		{"P384", elliptic.P384()},
+		{"p521", elliptic.P521()},
+	}
+	for _, tt := range tests {
+		got, err := ParseCurve(tt.name)
+		if err != nil {
+			t.Errorf("ParseCurve(%q) error = %v", tt.name, err)
+			continue
+		}
+		if got != tt.want {
+			t.Errorf("ParseCurve(%q) = %s, want %s", tt.name, got.Params().Name, tt.want.Params().Name)
+		}
+	}
+}
+
+func TestParseCurveRejectsUnknown(t *testing.T) {
+	for _, name := range []string{"", "p224", "ed25519"} {
+		if _, err := ParseCurve(name); err == nil {
+			t.Errorf("ParseCurve(%q) error = nil, want error", name)
+		}
 	}
 }

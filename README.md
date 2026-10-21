@@ -39,6 +39,8 @@ devca init
 
 This command will create files `ca.crt` and `ca.key` with the certificate and private key for the Certificate Authority.
 
+The private key uses the P-384 elliptic curve by default. Use `-c` (`--curve`) to choose `p256`, `p384` or `p521` (for example `devca init -c p256`). Certificates issued by the authority use the same curve.
+
 The certificate can be distributed and must be installed on Operating System stores to be trusted.
 
 ### Create Server Certificate

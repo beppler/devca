@@ -63,6 +63,7 @@ func (cmd *rootCommand) Handle() error {
 type initCommand struct {
 	Name     string   `arg:"positional" help:"Certificate authority name"`
 	Force    bool     `arg:"-f,--force" help:"Allow overwrite of the authority certificate"`
+	Curve    string   `arg:"-c,--curve" default:"p384" help:"Elliptic curve for the authority key (p256, p384 or p521)"`
 	Domains  []string `arg:"-d,--domain,separate" help:"Allowed domains for the authority"`
 	Networks []string `arg:"-n,--network,separate" help:"Allowed networks for the authority"`
 }
@@ -84,6 +85,11 @@ func (cmd *initCommand) Handle() error {
 		}
 	}
 
+	curve, err := ca.ParseCurve(cmd.Curve)
+	if err != nil {
+		return err
+	}
+
 	var networks []*net.IPNet
 	for _, network := range cmd.Networks {
 		_, ipNet, err := net.ParseCIDR(network)
@@ -93,7 +99,7 @@ func (cmd *initCommand) Handle() error {
 		networks = append(networks, ipNet)
 	}
 
-	caCert, caKey, err := ca.NewCertificateAuthority(caName, cmd.Domains, networks)
+	caCert, caKey, err := ca.NewCertificateAuthority(caName, curve, cmd.Domains, networks)
 	if err != nil {
 		return fmt.Errorf("could not create CA certificate: %w", err)
 	}
