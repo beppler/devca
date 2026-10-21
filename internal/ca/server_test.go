@@ -17,7 +17,7 @@ import (
 
 func newTestCA(t *testing.T, domains []string, networks []*net.IPNet) (*x509.Certificate, crypto.PrivateKey) {
 	t.Helper()
-	cert, key, err := NewCertificateAuthority("Test CA", domains, networks)
+	cert, key, err := NewCertificateAuthority("Test CA", elliptic.P384(), domains, networks)
 	if err != nil {
 		t.Fatal(err)
 	}

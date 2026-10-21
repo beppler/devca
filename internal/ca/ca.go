@@ -12,11 +12,27 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"strings"
 	"time"
 )
 
-func NewCertificateAuthority(authorityName string, domains []string, networks []*net.IPNet) (*x509.Certificate, crypto.PrivateKey, error) {
-	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+// ParseCurve returns the elliptic curve with the given name (p256, p384 or
+// p521, case insensitive).
+func ParseCurve(name string) (elliptic.Curve, error) {
+	switch strings.ToLower(name) {
+	case "p256":
+		return elliptic.P256(), nil
+	case "p384":
+		return elliptic.P384(), nil
+	case "p521":
+		return elliptic.P521(), nil
+	default:
+		return nil, fmt.Errorf("unsupported curve: %s", name)
+	}
+}
+
+func NewCertificateAuthority(authorityName string, curve elliptic.Curve, domains []string, networks []*net.IPNet) (*x509.Certificate, crypto.PrivateKey, error) {
+	privateKey, err := ecdsa.GenerateKey(curve, rand.Reader)
 	if err != nil {
 		return nil, nil, fmt.Errorf("create CA private key: %w", err)
 	}
