@@ -3,7 +3,6 @@ package ca
 import (
 	"crypto"
 	"crypto/ecdsa"
-	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
 	"fmt"
@@ -12,7 +11,8 @@ import (
 )
 
 // issue completes the leaf certificate template with validity, serial number
-// and a new private key, and signs it with the given certificate authority.
+// and a new private key on the same curve as the certificate authority, and
+// signs it with the given certificate authority.
 func issue(caCertificate *x509.Certificate, caPrivateKey crypto.PrivateKey, template *x509.Certificate, validity time.Duration) (*x509.Certificate, crypto.PrivateKey, error) {
 	notBefore := time.Now()
 	notAfter := notBefore.Add(validity)
@@ -21,7 +21,12 @@ func issue(caCertificate *x509.Certificate, caPrivateKey crypto.PrivateKey, temp
 		return nil, nil, fmt.Errorf("ca certificate will be expired before host certificate")
 	}
 
-	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	caPublicKey, ok := caCertificate.PublicKey.(*ecdsa.PublicKey)
+	if !ok {
+		return nil, nil, fmt.Errorf("unsupported CA key type %T: only ECDSA is supported", caCertificate.PublicKey)
+	}
+
+	privateKey, err := ecdsa.GenerateKey(caPublicKey.Curve, rand.Reader)
 	if err != nil {
 		return nil, nil, fmt.Errorf("create private key: %w", err)
 	}
