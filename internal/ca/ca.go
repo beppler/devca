@@ -37,11 +37,6 @@ func NewCertificateAuthority(authorityName string, curve elliptic.Curve, domains
 		return nil, nil, fmt.Errorf("create CA private key: %w", err)
 	}
 
-	var excludedNetworks []*net.IPNet
-	if len(domains) > 0 && len(networks) == 0 {
-		excludedNetworks = []*net.IPNet{{IP: net.IPv4zero, Mask: net.CIDRMask(0, 32)}, {IP: net.IPv6zero, Mask: net.CIDRMask(0, 128)}}
-	}
-
 	template := x509.Certificate{
 		SerialNumber: big.NewInt(1),
 		Subject: pkix.Name{
@@ -56,10 +51,7 @@ func NewCertificateAuthority(authorityName string, curve elliptic.Curve, domains
 		PermittedDNSDomainsCritical: len(domains) > 0,
 		PermittedDNSDomains:         domains,
 		PermittedIPRanges:           networks,
-	}
-
-	if len(excludedNetworks) > 0 {
-		template.ExcludedIPRanges = excludedNetworks
+		ExcludedIPRanges:            excludedNetworks(domains, networks),
 	}
 
 	certBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)

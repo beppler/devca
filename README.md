@@ -65,6 +65,21 @@ devca issue codesign "John Doe" -c US -o "ACME Corp"
 
 This command will create files `name-serial.crt` and `name-serial.key` with certificate and private key for code signing. Characters that are not safe in file names are replaced with `-` (for example `John-Doe-serial.crt`).
 
+### Create Subordinate Certificate Authority
+
+To create a subordinate certificate authority, go to the certificate authority directory and run `devca issue ca name` on it. The name is required. The domains (`-d`) and networks (`-n`) are optional and limit the names the subordinate authority can issue certificates for.
+
+```shell
+cd my-dev-ca
+devca issue ca "Team CA" -d team.example.com -n 10.0.0.0/8
+```
+
+This command will create files `name-serial.crt` and `name-serial.key` with certificate and private key for the subordinate authority. Characters that are not safe in file names are replaced with `-` (for example `Team-CA-serial.crt`).
+
+The subordinate authority is valid for 5 years, can issue server and code signing certificates but not other authorities, and its constraints must be within the ones of the signing authority (they are required when the authority has any).
+
+To issue certificates with a subordinate authority, copy its certificate and private key to a new directory as `ca.crt` and `ca.key` and run `devca issue server` or `devca issue codesign` there. The parent authority must be the one installed on the Operating System stores, and servers must present the subordinate authority certificate along with their own certificate in the chain (for example `cat hostname-serial.crt team-ca-serial.crt > fullchain.crt`).
+
 ## Release
 
 Pushing a tag that starts with `v` (for example `v1.2.0`) triggers the [Release workflow](.github/workflows/release.yml), which builds the binaries with [GoReleaser](https://goreleaser.com) and creates a GitHub release with them attached.
