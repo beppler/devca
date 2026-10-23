@@ -9,6 +9,9 @@ import (
 	"time"
 )
 
+// codeSigningValidity is how long code signing certificates are valid (2 years).
+const codeSigningValidity = time.Hour * 24 * 365 * 2
+
 // IssueCodeSigning issues a code signing certificate for the given subject,
 // signed by the given certificate authority. Country and organization are
 // optional.
@@ -39,7 +42,7 @@ func IssueCodeSigning(caCertificate *x509.Certificate, caPrivateKey crypto.Priva
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning},
 	}
 
-	return issue(caCertificate, caPrivateKey, &template, time.Hour*24*365*2)
+	return issue(caCertificate, caPrivateKey, &template, codeSigningValidity)
 }
 
 // isCountryCode reports whether s has the shape of an ISO 3166-1 alpha-2 code.

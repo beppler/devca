@@ -31,6 +31,10 @@ func ParseCurve(name string) (elliptic.Curve, error) {
 	}
 }
 
+// rootAuthorityValidity is how long the root certificate authority is valid:
+// longer than subordinate authorities and leaf certificates (10 years).
+const rootAuthorityValidity = time.Hour * 24 * 365 * 10
+
 func NewCertificateAuthority(authorityName string, curve elliptic.Curve, domains []string, networks []*net.IPNet) (*x509.Certificate, crypto.PrivateKey, error) {
 	privateKey, err := ecdsa.GenerateKey(curve, rand.Reader)
 	if err != nil {
@@ -43,7 +47,7 @@ func NewCertificateAuthority(authorityName string, curve elliptic.Curve, domains
 			CommonName: authorityName,
 		},
 		NotBefore:                   time.Now(),
-		NotAfter:                    time.Now().Add(time.Hour * 24 * 365 * 10),
+		NotAfter:                    time.Now().Add(rootAuthorityValidity),
 		KeyUsage:                    x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
 		IsCA:                        true,
 		MaxPathLen:                  1,
@@ -68,7 +72,7 @@ func NewCertificateAuthority(authorityName string, curve elliptic.Curve, domains
 }
 
 // authorityValidity is how long subordinate certificate authorities are valid:
-// longer than leaf certificates, shorter than the root authority.
+// longer than leaf certificates, shorter than the root authority (5 years).
 const authorityValidity = time.Hour * 24 * 365 * 5
 
 // IssueCertificateAuthority issues a subordinate certificate authority with
