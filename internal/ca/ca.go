@@ -31,15 +31,14 @@ func ParseCurve(name string) (elliptic.Curve, error) {
 	}
 }
 
+// rootAuthorityValidity is how long the root certificate authority is valid:
+// longer than subordinate authorities and leaf certificates (10 years).
+const rootAuthorityValidity = time.Hour * 24 * 365 * 10
+
 func NewCertificateAuthority(authorityName string, curve elliptic.Curve, domains []string, networks []*net.IPNet) (*x509.Certificate, crypto.PrivateKey, error) {
 	privateKey, err := ecdsa.GenerateKey(curve, rand.Reader)
 	if err != nil {
 		return nil, nil, fmt.Errorf("create CA private key: %w", err)
-	}
-
-	var excludedNetworks []*net.IPNet
-	if len(domains) > 0 && len(networks) == 0 {
-		excludedNetworks = []*net.IPNet{{IP: net.IPv4zero, Mask: net.CIDRMask(0, 32)}, {IP: net.IPv6zero, Mask: net.CIDRMask(0, 128)}}
 	}
 
 	template := x509.Certificate{
@@ -48,7 +47,7 @@ func NewCertificateAuthority(authorityName string, curve elliptic.Curve, domains
 			CommonName: authorityName,
 		},
 		NotBefore:                   time.Now(),
-		NotAfter:                    time.Now().Add(time.Hour * 24 * 365 * 10),
+		NotAfter:                    time.Now().Add(rootAuthorityValidity),
 		KeyUsage:                    x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
 		IsCA:                        true,
 		MaxPathLen:                  1,
@@ -56,10 +55,7 @@ func NewCertificateAuthority(authorityName string, curve elliptic.Curve, domains
 		PermittedDNSDomainsCritical: len(domains) > 0,
 		PermittedDNSDomains:         domains,
 		PermittedIPRanges:           networks,
-	}
-
-	if len(excludedNetworks) > 0 {
-		template.ExcludedIPRanges = excludedNetworks
+		ExcludedIPRanges:            excludedNetworks(domains, networks),
 	}
 
 	certBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
@@ -73,4 +69,49 @@ func NewCertificateAuthority(authorityName string, curve elliptic.Curve, domains
 	}
 
 	return cert, privateKey, nil
+}
+
+// authorityValidity is how long subordinate certificate authorities are valid:
+// longer than leaf certificates, shorter than the root authority (5 years).
+const authorityValidity = time.Hour * 24 * 365 * 5
+
+// IssueCertificateAuthority issues a subordinate certificate authority with
+// the given name and name constraints, signed by the given certificate
+// authority. The subordinate authority can issue certificates but not other
+// authorities, and its constraints must be within the ones of the signing
+// authority.
+func IssueCertificateAuthority(caCertificate *x509.Certificate, caPrivateKey crypto.PrivateKey, authorityName string, domains []string, networks []*net.IPNet) (*x509.Certificate, crypto.PrivateKey, error) {
+	authorityName = strings.TrimSpace(authorityName)
+	if authorityName == "" {
+		return nil, nil, fmt.Errorf("authority name should be provided")
+	}
+
+	if !caCertificate.IsCA {
+		return nil, nil, fmt.Errorf("signer certificate is not a certificate authority")
+	}
+
+	if caCertificate.MaxPathLen == 0 && caCertificate.MaxPathLenZero {
+		return nil, nil, fmt.Errorf("certificate authority cannot issue other certificate authorities")
+	}
+
+	if err := validateConstraints(caCertificate, domains, networks); err != nil {
+		return nil, nil, err
+	}
+
+	template := x509.Certificate{
+		Subject: pkix.Name{
+			CommonName: authorityName,
+		},
+		KeyUsage:                    x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+		IsCA:                        true,
+		BasicConstraintsValid:       true,
+		MaxPathLen:                  0,
+		MaxPathLenZero:              true,
+		PermittedDNSDomainsCritical: len(domains) > 0,
+		PermittedDNSDomains:         domains,
+		PermittedIPRanges:           networks,
+		ExcludedIPRanges:            excludedNetworks(domains, networks),
+	}
+
+	return sign(caCertificate, caPrivateKey, &template, authorityValidity)
 }

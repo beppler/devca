@@ -90,13 +90,9 @@ func (cmd *initCommand) Handle() error {
 		return err
 	}
 
-	var networks []*net.IPNet
-	for _, network := range cmd.Networks {
-		_, ipNet, err := net.ParseCIDR(network)
-		if err != nil {
-			return fmt.Errorf("invalid network constraint: %s", network)
-		}
-		networks = append(networks, ipNet)
+	networks, err := parseNetworks(cmd.Networks)
+	if err != nil {
+		return err
 	}
 
 	caCert, caKey, err := ca.NewCertificateAuthority(caName, curve, cmd.Domains, networks)
@@ -112,7 +108,22 @@ func (cmd *initCommand) Handle() error {
 	return nil
 }
 
+// parseNetworks parses the network constraints given on the command line as
+// CIDR blocks.
+func parseNetworks(networks []string) ([]*net.IPNet, error) {
+	var parsed []*net.IPNet
+	for _, network := range networks {
+		_, ipNet, err := net.ParseCIDR(network)
+		if err != nil {
+			return nil, fmt.Errorf("invalid network constraint: %s", network)
+		}
+		parsed = append(parsed, ipNet)
+	}
+	return parsed, nil
+}
+
 type issueCommand struct {
+	CA       *caCommand       `arg:"subcommand:ca" help:"Issue Subordinate Certificate Authority"`
 	Server   *serverCommand   `arg:"subcommand:server" help:"Issue Server Certificate"`
 	CodeSign *codeSignCommand `arg:"subcommand:codesign" help:"Issue Code Signing Certificate"`
 }
@@ -123,9 +134,42 @@ func (cmd *issueCommand) Handle() error {
 		return cmd.Server.Handle()
 	case cmd.CodeSign != nil:
 		return cmd.CodeSign.Handle()
+	case cmd.CA != nil:
+		return cmd.CA.Handle()
 	default:
 		return fmt.Errorf("missing subcommand")
 	}
+}
+
+type caCommand struct {
+	Name     string   `arg:"positional,required" help:"Subordinate certificate authority name"`
+	Domains  []string `arg:"-d,--domain,separate" help:"Allowed domains for the authority"`
+	Networks []string `arg:"-n,--network,separate" help:"Allowed networks for the authority"`
+}
+
+func (cmd *caCommand) Handle() error {
+	caCert, caKey, err := pemfile.Load("ca.crt", "ca.key")
+	if err != nil {
+		return fmt.Errorf("could not load signer certificate: %w", err)
+	}
+
+	networks, err := parseNetworks(cmd.Networks)
+	if err != nil {
+		return err
+	}
+
+	cert, key, err := ca.IssueCertificateAuthority(caCert, caKey, cmd.Name, cmd.Domains, networks)
+	if err != nil {
+		return fmt.Errorf("could not sign certificate authority: %w", err)
+	}
+
+	baseFileName := ca.FileSafeName(cert.Subject.CommonName, "ca") + "-" + fmt.Sprintf("%x", cert.SerialNumber)
+	err = pemfile.Save(cert, baseFileName+".crt", key, baseFileName+".key")
+	if err != nil {
+		return fmt.Errorf("could not save certificate authority certificate: %w", err)
+	}
+
+	return nil
 }
 
 type serverCommand struct {

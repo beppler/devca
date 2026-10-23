@@ -14,11 +14,21 @@ import (
 // and a new private key on the same curve as the certificate authority, and
 // signs it with the given certificate authority.
 func issue(caCertificate *x509.Certificate, caPrivateKey crypto.PrivateKey, template *x509.Certificate, validity time.Duration) (*x509.Certificate, crypto.PrivateKey, error) {
+	template.IsCA = false
+	template.BasicConstraintsValid = true
+	return sign(caCertificate, caPrivateKey, template, validity)
+}
+
+// sign completes the given certificate template with validity, serial number
+// and a new private key on the same curve as the certificate authority, and
+// signs it with the given certificate authority. The template must carry the
+// basic constraints and key usage appropriate to the certificate kind.
+func sign(caCertificate *x509.Certificate, caPrivateKey crypto.PrivateKey, template *x509.Certificate, validity time.Duration) (*x509.Certificate, crypto.PrivateKey, error) {
 	notBefore := time.Now()
 	notAfter := notBefore.Add(validity)
 
 	if notBefore.After(caCertificate.NotAfter) || notAfter.After(caCertificate.NotAfter) {
-		return nil, nil, fmt.Errorf("ca certificate will be expired before host certificate")
+		return nil, nil, fmt.Errorf("ca certificate will be expired before the issued certificate")
 	}
 
 	caPublicKey, ok := caCertificate.PublicKey.(*ecdsa.PublicKey)
@@ -31,8 +41,6 @@ func issue(caCertificate *x509.Certificate, caPrivateKey crypto.PrivateKey, temp
 		return nil, nil, fmt.Errorf("create private key: %w", err)
 	}
 
-	template.IsCA = false
-	template.BasicConstraintsValid = true
 	template.SerialNumber = big.NewInt(notBefore.Unix())
 	template.NotBefore = notBefore
 	template.NotAfter = notAfter

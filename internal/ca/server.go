@@ -9,6 +9,9 @@ import (
 	"time"
 )
 
+// serverValidity is how long server certificates are valid (2 years).
+const serverValidity = time.Hour * 24 * 365 * 2
+
 // IssueServer issues a server certificate for the given host names and IP
 // addresses, signed by the given certificate authority.
 func IssueServer(caCertificate *x509.Certificate, caPrivateKey crypto.PrivateKey, hostNames []string, ips []net.IP) (*x509.Certificate, crypto.PrivateKey, error) {
@@ -45,5 +48,5 @@ func IssueServer(caCertificate *x509.Certificate, caPrivateKey crypto.PrivateKey
 		template.IPAddresses = ips
 	}
 
-	return issue(caCertificate, caPrivateKey, &template, time.Hour*24*365*2)
+	return issue(caCertificate, caPrivateKey, &template, serverValidity)
 }
