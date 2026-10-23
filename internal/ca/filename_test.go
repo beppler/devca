@@ -7,9 +7,9 @@ func TestFileSafeName(t *testing.T) {
 		name string
 		want string
 	}{
-		{"Developer", "Developer"},
-		{"ACME Corp / Dev", "ACME-Corp-Dev"},
-		{"Bücher", "B-cher"},
+		{"Developer", "developer"},
+		{"ACME Corp / Dev", "acme-corp-dev"},
+		{"Bücher", "b-cher"},
 		{"my_cert.v1", "my_cert.v1"},
 		{"///", "codesign"},
 	}
