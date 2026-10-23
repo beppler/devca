@@ -155,7 +155,7 @@ func (cmd *serverCommand) Handle() error {
 		return fmt.Errorf("could not sign server certificate: %w", err)
 	}
 
-	baseFileName := ca.FileSafeName(hostNames[0] + "-" + fmt.Sprintf("%x", hostCert.SerialNumber))
+	baseFileName := ca.FileSafeName(hostNames[0], "server") + "-" + fmt.Sprintf("%x", hostCert.SerialNumber)
 	err = pemfile.Save(hostCert, baseFileName+".crt", hostKey, baseFileName+".key")
 	if err != nil {
 		return fmt.Errorf("could not save server certificate: %w", err)
@@ -181,7 +181,7 @@ func (cmd *codeSignCommand) Handle() error {
 		return fmt.Errorf("could not sign code signing certificate: %w", err)
 	}
 
-	baseFileName := ca.FileSafeName(cert.Subject.CommonName) + "-" + fmt.Sprintf("%x", cert.SerialNumber)
+	baseFileName := ca.FileSafeName(cert.Subject.CommonName, "codesign") + "-" + fmt.Sprintf("%x", cert.SerialNumber)
 	err = pemfile.Save(cert, baseFileName+".crt", key, baseFileName+".key")
 	if err != nil {
 		return fmt.Errorf("could not save code signing certificate: %w", err)
