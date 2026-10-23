@@ -123,9 +123,9 @@ func parseNetworks(networks []string) ([]*net.IPNet, error) {
 }
 
 type issueCommand struct {
+	CA       *caCommand       `arg:"subcommand:ca" help:"Issue Subordinate Certificate Authority"`
 	Server   *serverCommand   `arg:"subcommand:server" help:"Issue Server Certificate"`
 	CodeSign *codeSignCommand `arg:"subcommand:codesign" help:"Issue Code Signing Certificate"`
-	CA       *caCommand       `arg:"subcommand:ca" help:"Issue Subordinate Certificate Authority"`
 }
 
 func (cmd *issueCommand) Handle() error {
@@ -139,6 +139,37 @@ func (cmd *issueCommand) Handle() error {
 	default:
 		return fmt.Errorf("missing subcommand")
 	}
+}
+
+type caCommand struct {
+	Name     string   `arg:"positional,required" help:"Subordinate certificate authority name"`
+	Domains  []string `arg:"-d,--domain,separate" help:"Allowed domains for the authority"`
+	Networks []string `arg:"-n,--network,separate" help:"Allowed networks for the authority"`
+}
+
+func (cmd *caCommand) Handle() error {
+	caCert, caKey, err := pemfile.Load("ca.crt", "ca.key")
+	if err != nil {
+		return fmt.Errorf("could not load signer certificate: %w", err)
+	}
+
+	networks, err := parseNetworks(cmd.Networks)
+	if err != nil {
+		return err
+	}
+
+	cert, key, err := ca.IssueCertificateAuthority(caCert, caKey, cmd.Name, cmd.Domains, networks)
+	if err != nil {
+		return fmt.Errorf("could not sign certificate authority: %w", err)
+	}
+
+	baseFileName := ca.FileSafeName(cert.Subject.CommonName, "ca") + "-" + fmt.Sprintf("%x", cert.SerialNumber)
+	err = pemfile.Save(cert, baseFileName+".crt", key, baseFileName+".key")
+	if err != nil {
+		return fmt.Errorf("could not save certificate authority certificate: %w", err)
+	}
+
+	return nil
 }
 
 type serverCommand struct {
@@ -198,37 +229,6 @@ func (cmd *codeSignCommand) Handle() error {
 	err = pemfile.Save(cert, baseFileName+".crt", key, baseFileName+".key")
 	if err != nil {
 		return fmt.Errorf("could not save code signing certificate: %w", err)
-	}
-
-	return nil
-}
-
-type caCommand struct {
-	Name     string   `arg:"positional,required" help:"Subordinate certificate authority name"`
-	Domains  []string `arg:"-d,--domain,separate" help:"Allowed domains for the authority"`
-	Networks []string `arg:"-n,--network,separate" help:"Allowed networks for the authority"`
-}
-
-func (cmd *caCommand) Handle() error {
-	caCert, caKey, err := pemfile.Load("ca.crt", "ca.key")
-	if err != nil {
-		return fmt.Errorf("could not load signer certificate: %w", err)
-	}
-
-	networks, err := parseNetworks(cmd.Networks)
-	if err != nil {
-		return err
-	}
-
-	cert, key, err := ca.IssueCertificateAuthority(caCert, caKey, cmd.Name, cmd.Domains, networks)
-	if err != nil {
-		return fmt.Errorf("could not sign certificate authority: %w", err)
-	}
-
-	baseFileName := ca.FileSafeName(cert.Subject.CommonName, "ca") + "-" + fmt.Sprintf("%x", cert.SerialNumber)
-	err = pemfile.Save(cert, baseFileName+".crt", key, baseFileName+".key")
-	if err != nil {
-		return fmt.Errorf("could not save certificate authority certificate: %w", err)
 	}
 
 	return nil
