@@ -3,6 +3,7 @@ package ca
 import "testing"
 
 func TestFileSafeName(t *testing.T) {
+	const defaultName = "default"
 	tests := []struct {
 		name string
 		want string
@@ -11,12 +12,16 @@ func TestFileSafeName(t *testing.T) {
 		{"ACME Corp / Dev", "acme-corp-dev"},
 		{"Bücher", "b-cher"},
 		{"my_cert.v1", "my_cert.v1"},
-		{"///", "codesign"},
+		{"*.localhost", ".localhost"},
+		{"localhost.*", "localhost."},
+		{"", defaultName},
+		{"   ", defaultName},
+		{"///", defaultName},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := FileSafeName(tt.name); got != tt.want {
+			if got := FileSafeName(tt.name, defaultName); got != tt.want {
 				t.Errorf("FileSafeName(%q) = %q, want %q", tt.name, got, tt.want)
 			}
 		})
